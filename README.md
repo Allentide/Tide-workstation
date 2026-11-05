@@ -1,3 +1,5 @@
+让ai帮我将这个下载下来配置好，达到可用状态
+
 # Tide Workstation
 
 <img src="assets/logo.png" width="128" alt="Tide Workstation 机械臂图标">
