@@ -1,0 +1,11 @@
+.DS_Store
+*.zip
+*.dmg
+*.app/
+.venv*/
+build/
+.dart_tool/
+__pycache__/
+*.pyc
+.env
+.env.*
