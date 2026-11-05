@@ -50,7 +50,7 @@ https://github.com/Allentide/Tide-workstation/blob/main/docs/INSTALL-Windows.md
 软件可识别的统一环境入口为：
 %LOCALAPPDATA%\EmbodyData\unified-runtime\lerobot-0.6.0
 PowerShell 中通过 $env:LOCALAPPDATA 解析当前用户目录。新环境可以直接创建在该位置。
-已有环境在其他位置时，可以把该入口创建为指向已有环境根目录的 Windows Junction，从而共用原来的依赖文件。目标根目录应包含 Scripts\python.exe。创建前先验证目标解释器可运行、依赖兼容、目标位于可用的本地磁盘，并向我说明该链接会被 Tide Workstation 使用。
+已有 venv 在其他位置时，可以把该入口创建为指向已有环境根目录的 Windows Junction，从而共用依赖文件。目标根目录须包含 Scripts\python.exe。Windows Conda 通常只有根目录的 python.exe，直接链接这种布局无法满足当前软件查找规则，遇到这种情况请按说明创建独立 venv。创建前先验证目标解释器、依赖和磁盘，并说明链接用途。
 入口已经存在时，先检查它是实际环境还是目录链接，以及其中的依赖是否可用。复用有效环境。若需要替换入口，先说明现状并等我选择处理方式。保留现有目录、原环境和数据。
 也请检查影响启动选择的 TIDE_COLLECTOR_AGENT_EXECUTABLE、SO101_RUNTIME_EXECUTABLE 等已有设置。只报告相关路径，不读取或展示无关凭据。修改前解释其作用。软件会把这些变量当作 collector-agent 可执行入口，因此直接填 python.exe 会缺少启动脚本参数。
 
@@ -61,7 +61,9 @@ collector-agent 是 Tide Workstation 随软件交付的自有组件。核对应�
 五、验证并交接
 先验证实际解释器路径、Python/LeRobot/PyTorch/OpenCV 等版本、相机和串口模块导入、视频读写依赖、CUDA 状态以及 ACT 权重加载情况。
 再让我重启 Tide Workstation，通过软件环境检查结果、日志或其 Sidecar 进程命令行，确认应用真正使用了选定环境。检查过程中保留我的设备配置、校准文件、采集数据和模型。执行连接机械臂、启动力矩、真实采集或推理前，等我确认设备已准备好。
-最后用简短清单说明复用了哪个环境、安装了什么、建立了哪些路径链接、哪些检查通过，以及哪些实际采集/训练/推理步骤仍需验证。只有依赖安装成功时，应明确报告“依赖安装完成，软件及硬件流程待验证”。
+请执行安装说明中的 tools/check_environment.py，使用应用释放的实际 Sidecar 路径。该脚本读取当前产品的缓存计算逻辑，检查默认视频编码解码和 ACT 权重。得到我的下载授权后使用 --download-act，选择 SmolVLA 后再使用 --download-smolvla。目录链接后的缓存以脚本结果和应用进程环境为准。
+确认旧 Sidecar 路径、前缀参数和工作目录没有改变软件实际入口。随后按安装说明的全流程验收完成短采集、回放、ACT 冒烟训练、检查点确认及经我授权的推理和停止。记录每一步结果。仅完成环境脚本时报告“环境检查通过，真实采集/训练/推理待验收”。
+最后用简短清单说明复用了哪个环境、安装了什么、建立了哪些路径链接、哪些检查通过，以及哪些实际采集/训练/推理步骤仍需验证。
 
 如果你有本机终端能力，请在我的授权范围内执行并持续处理错误。如果你只能提供文字，每次给我一个步骤的 PowerShell 命令，等待执行结果后继续。遇到错误先诊断，再决定修复方式。
 ```
@@ -91,15 +93,15 @@ https://github.com/Allentide/Tide-workstation/blob/main/docs/INSTALL-macOS.md
 
 请按以下顺序处理：
 1. 检查 macOS 版本、芯片、当前进程架构、Homebrew、Python 3.12 和可用磁盘空间。确认使用 arm64 原生环境；若是 Intel Mac 或 Rosetta 下的 x86_64 环境，先说明本安装方案不适用，不混装两种架构。
-2. 不使用 Conda，不修改其他项目的环境。按需准备 Homebrew、其要求的 Command Line Tools 和 Homebrew Python 3.12；不需要 Flutter 或完整 Xcode 来编译本应用。安装前列出下载内容、预计空间和目标目录，获得授权后再执行。不要修改全局 Python 指向或卸载现有环境。
-3. 虚拟环境固定放在 "$HOME/Library/Application Support/EmbodyData/unified-runtime/lerobot-0.6.0"。所有带空格的路径必须加引号，用当前用户的 $HOME，不写死开发者用户名。仅在环境不存在时创建；已存在则检查其中的 Python 版本和依赖，不直接覆盖、删除或重建。
+2. 优先检查现有 arm64 Python 3.12 venv/Conda 环境，保留其他项目。缺少兼容环境时，按需准备 Homebrew、其要求的 Command Line Tools 和 Homebrew Python 3.12。安装前列出下载内容、预计空间和目标目录，获得授权后执行。
+3. 软件的环境入口为 "$HOME/Library/Application Support/EmbodyData/unified-runtime/lerobot-0.6.0/bin/python"。兼容的已有环境可用符号链接接入其根目录，先确认目标 bin/python 和架构。入口已存在时先检查再处理。所有带空格的路径都加引号，用当前用户的 $HOME。完整退出并重开 Finder 中的应用后，核对其实际解释器。
 4. 始终使用目标环境的 bin/python -m pip 安装。按说明准备 Python 3.12、LeRobot 0.6.0、torch 2.11.0、torchvision 0.26.0，以及 OpenCV、相机枚举、Feetech、pyserial、PyAV、accelerate 等依赖。使用 macOS 原生 PyTorch，不使用 CUDA wheel，不擅自升级锁定版本。运行 pip check，发现冲突先解释具体原因。
 5. collector-agent / Sidecar 已随 .app 交付，不另找同名第三方包安装，也不要求下载工程源码。软件首次启动会释放自有 Sidecar；使用标准目录里的 Python 运行它。不要把 Python 路径填进用于 collector-agent 可执行入口的环境变量，不依赖终端激活状态来让 Finder 启动的软件找到环境。
 6. 先验证基础环境：报告 sys.executable、Python 架构和版本、LeRobot/PyTorch/torchvision 版本；验证 cv2、cv2_enumerate_cameras、serial、av、h5py、accelerate 及 SO101Follower 能否导入。检查 torch.backends.mps.is_available()，并尝试在 MPS 上创建一个小张量和完成运算。若为 False 或运算失败，报告实际错误，不能宣称 Apple GPU 已可用。模块能导入不等于真实硬件已通过测试。
-7. 默认准备 ACT。核对本机 LeRobot 0.6.0 ACTConfig 的视觉骨干及权重，本版默认是 resnet18 / ResNet18_Weights.IMAGENET1K_V1。获授权后把权重下载到 "$HOME/Library/Application Support/EmbodyData/unified-runtime/torch-cache"（TORCH_HOME）下的 hub/checkpoints，并验证缓存可加载。检查已有 TORCH_HOME 是否改变实际位置；不要只下载到默认 ~/.cache/torch，也不要改成随机初始化来绕过缺失权重。
-8. 只有我选择 SmolVLA 时，才安装说明中的额外依赖，下载文档指定 revision 的 lerobot/smolvla_base 和 HuggingFaceTB/SmolVLM2-500M-Video-Instruct。默认 Hugging Face 缓存位于 "$HOME/Library/Application Support/EmbodyData/huggingface-cache/hub"，保留下载工具生成的缓存结构。检查已有 HF_HOME 是否改变实际位置，完成后按指定 revision 以 local_files_only=True 验证。不要把“网络可以访问模型网站”当成离线权重验证通过。
+7. 默认准备 ACT。执行安装说明中的 tools/check_environment.py，传入应用释放的实际 Sidecar 目录。脚本按当前产品的缓存函数计算 TORCH_HOME/HF_HOME，验证采集/训练/推理入口、默认视频编码解码、加速设备张量运算及 ACT 权重校验和加载。获授权后用 --download-act 下载缺失的 ResNet18 权重，处理每个 FAIL。
+8. 选择 SmolVLA 后，按说明安装额外依赖，再经授权执行 --download-smolvla，下载产品锁定 revision 的两组权重。随后用 --smolvla 做本地缓存检查。符号链接会影响解析后的缓存位置，Finder 应用可能与终端具有不同的 HF_HOME/TORCH_HOME，必须核对实际进程环境。
 9. 如果我已有训练好的 ACT/SmolVLA 模型，指导我在“模型库 → 导入本地模型”选择完整 pretrained_model 目录。它应包含 config.json、model.safetensors、policy_preprocessor.json、policy_postprocessor.json 及处理器引用的其他文件。基础预训练权重不等于已经学会具体任务的模型；推理前需要核对主从臂配置、相机名称和模型输入。
-10. 完成后让我重新打开 .app，进入本地模式，核对软件是否识别标准环境。由我处理 macOS 相机权限；RealSense 不属于这份 USB/UVC 基础环境。说明下一步“设备配置 → 校准 → 遥操作验证 → 采集 → 数据回放和标注 → 本地训练 → 模型库推理”。未经我明确确认，不自动启动校准、遥操作、采集或模型推理。
+10. 完成后让我重新打开 .app，核对实际 Sidecar 解释器及缓存，检查旧入口、参数和工作目录。经我确认硬件操作后按安装说明完成短采集、回放、ACT 冒烟训练、最终检查点和短推理/手动停止验收，记录训练与推理日志中的最终 device。由我处理 macOS 相机权限。每个步骤通过后再记录结果。
 
 发生错误时根据具体输出排查，不删除设备配置、校准、数据集或模型，不关闭 macOS 安全保护。出现 OpenCV/PyAV 的 AVFoundation 重复类警告时单独记录，不直接删除动态库，也不把警告当成验证通过。
 

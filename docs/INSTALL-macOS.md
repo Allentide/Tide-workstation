@@ -2,7 +2,7 @@
 
 本说明适用于 Apple Silicon（M 系列芯片）Mac。建议使用较新的 macOS，训练建议至少 16 GB 统一内存。具体系统兼容性仍受 PyTorch 等第三方包限制；Intel Mac 暂不在本版验证范围。
 
-希望让 AI 协助安装，可复制 [README 中的 macOS 环境准备提示词](../README.md#用-ai-帮你准备-macos-环境)。提示词按本说明的标准目录和版本执行，不适配其他项目的环境。
+希望让 AI 协助安装或复用已有环境，可复制 [README 中的 macOS 环境准备提示词](../README.md#用-ai-帮你准备-macos-环境)。AI 应先检查实际解释器、依赖和路径，再选择复用或新建。
 
 ## 1. 下载应用
 
@@ -41,7 +41,7 @@
     "PyYAML>=6,<7" "websockets>=13,<16" \
     "rerun-sdk==0.33.1" "pyserial>=3.5,<4"
 
-  "$TIDE_RUNTIME/bin/python" -c 'import platform, sys, torch, lerobot, cv2, av, serial, h5py, accelerate; print("CPU:", platform.machine()); print("Python:", sys.executable); print("LeRobot:", lerobot.__version__); print("PyTorch:", torch.__version__); print("MPS:", torch.backends.mps.is_available())'
+  "$TIDE_RUNTIME/bin/python" -c 'import importlib.metadata as m; import platform, sys, torch, cv2, av, serial, h5py, accelerate; print("CPU:", platform.machine()); print("Python:", sys.executable); print("LeRobot:", m.version("lerobot")); print("PyTorch:", torch.__version__); print("MPS:", torch.backends.mps.is_available())'
 )
 ```
 
@@ -63,27 +63,14 @@ SO-101 主从臂通过 USB 连接，串口一般显示为 `/dev/cu.*`。发现�
 
 ## 4. 训练所需权重
 
-ACT 首次训练可能需要联网下载 ResNet18 预训练权重。此发布包没有附带权重，也不承诺首次启动断网可训练。
+ACT 训练前需准备 ResNet18 预训练权重。请按下方检查命令，将权重下载并验证到应用实际使用的缓存。
 
 本版默认 ACT 使用 `ResNet18_Weights.IMAGENET1K_V1`。软件未收到 `TORCH_HOME` 覆盖时，使用 `~/Library/Application Support/EmbodyData/unified-runtime/torch-cache`，权重文件位于其 `hub/checkpoints` 下。请让 AI 在这个缓存位置准备并验证权重，不要只放在终端默认的 `~/.cache/torch`。已有 `TORCH_HOME` / `HF_HOME` 时，应先核对软件进程实际使用的位置，不能仅以当前终端的下载成功作为依据。
 
-SmolVLA 还需要额外依赖和两组指定版本的权重。计划使用时，在同一环境执行：
+SmolVLA 需要额外依赖和两组指定版本的权重。计划使用时，在同一环境安装依赖，然后完成第 8 节的检查和权重下载。
 
 ```bash
-source "$HOME/Library/Application Support/EmbodyData/unified-runtime/lerobot-0.6.0/bin/activate"
-python -m pip install 'lerobot[smolvla]==0.6.0'
-python - <<'PY'
-from pathlib import Path
-from huggingface_hub import snapshot_download
-
-cache = Path.home() / "Library/Application Support/EmbodyData/huggingface-cache/hub"
-for repo, revision in [
-    ("lerobot/smolvla_base", "c83c3163b8ca9b7e67c509fffd9121e66cb96205"),
-    ("HuggingFaceTB/SmolVLM2-500M-Video-Instruct", "7b375e1b73b11138ff12fe22c8f2822d8fe03467"),
-]:
-    snapshot_download(repo_id=repo, revision=revision, cache_dir=str(cache))
-print("SmolVLA 权重下载完成")
-PY
+"$HOME/Library/Application Support/EmbodyData/unified-runtime/lerobot-0.6.0/bin/python" -m pip install 'lerobot[smolvla]==0.6.0'
 ```
 
 这是用户主动联网下载步骤，需要足够磁盘空间；权重许可见各模型页面。软件的 SmolVLA 预检查使用本地缓存，缺少权重时会报错。
@@ -108,3 +95,52 @@ shasum -a 256 -c SHA256SUMS.txt
 ```
 
 输出 `OK` 表示下载文件与发布校验值一致。
+
+## 7. 复用已有环境
+
+统一入口为 `$HOME/Library/Application Support/EmbodyData/unified-runtime/lerobot-0.6.0/bin/python`。已有 Apple Silicon 原生 Python 3.12 venv 或 Conda 环境可在完整验证后，通过符号链接接入该入口的环境根目录。AI 应先确认目标包含可运行的 `bin/python`，依赖版本匹配，并检查路径链接和原目录用途。入口已存在时，先核对再处理。
+
+Finder 启动的应用通常具有不同于交互式终端的环境。仅在终端激活环境、修改 shell 配置或设置 `TORCH_HOME` / `HF_HOME`，不能证明 Finder 应用使用了相同配置。优先通过上述入口接入，随后重启应用，核对实际 Sidecar 进程与缓存路径。
+
+旧 Sidecar 路径、前缀参数、工作目录及 `TIDE_COLLECTOR_AGENT_EXECUTABLE` / `SO101_RUNTIME_EXECUTABLE` 覆盖项也需要检查。环境、Sidecar、校准、数据和模型路径都应使用当前 Mac 的有效路径。由 Windows 复制过来的配置若包含盘符路径，应通过软件重新选择或导入对应资源。
+
+## 8. 应用环境检查和 ACT 权重
+
+先打开一次 `.app` 释放随包 Sidecar，再完全退出。以下命令在 zsh 中执行，所有带空格的路径都保留双引号。
+
+```bash
+TIDE_RUNTIME="$HOME/Library/Application Support/EmbodyData/unified-runtime/lerobot-0.6.0"
+TIDE_SIDECAR="$HOME/Library/Application Support/EmbodyData/sidecar"
+TIDE_CHECK="$(mktemp -t tide-check-environment)"
+curl --fail --location 'https://raw.githubusercontent.com/Allentide/Tide-workstation/main/tools/check_environment.py' -o "$TIDE_CHECK"
+"$TIDE_RUNTIME/bin/python" "$TIDE_CHECK" --sidecar-root "$TIDE_SIDECAR"
+```
+
+确认下载 ACT 权重后执行以下命令。检查脚本从当前 Sidecar 读取缓存规则，因此复用符号链接环境时也能按真实目录准备权重。
+
+```bash
+"$TIDE_RUNTIME/bin/python" "$TIDE_CHECK" --sidecar-root "$TIDE_SIDECAR" --download-act
+"$TIDE_RUNTIME/bin/python" "$TIDE_SIDECAR/scripts/collector-agent" training-capabilities
+```
+
+选择 SmolVLA 并安装其依赖后，可经授权下载产品锁定的两组完整权重，再做本地缓存检查。下载可能达到数 GB。
+
+```bash
+"$TIDE_RUNTIME/bin/python" "$TIDE_CHECK" --sidecar-root "$TIDE_SIDECAR" --download-smolvla
+"$TIDE_RUNTIME/bin/python" "$TIDE_CHECK" --sidecar-root "$TIDE_SIDECAR" --smolvla
+```
+
+脚本验证 Python 和依赖、LeRobot 采集/训练/推理入口导入、实际加速设备张量运算、默认 AV1 视频编码解码、ACT 权重校验加载以及 `pip check`。相机和机械臂由用户后续在软件中连接。检查结果为 `FAIL` 时先处理具体错误。
+
+Apple GPU 是否实际参与训练或推理，还要核对任务日志中的最终 `device`。当前启动配置可能请求 CUDA，LeRobot 0.6 在该设备不可用时会结合策略配置重新选择设备。`MPS: True` 说明 MPS 可用，实际模型前向/反向与运行性能需要任务验证。
+
+## 9. 全流程验收
+
+让 AI 核对 Finder 启动的软件使用了上述解释器和缓存，再由用户确认硬件操作。
+
+1. 完成相机权限、设备组、校准和遥操作验证，保存一个短 Episode 并成功回放视频和关节数据。
+2. 用该 Episode 执行 ACT 冒烟训练，例如 100 步、Batch size 1、数据加载进程 0，确认 Loss 更新和最终检查点生成。记录训练日志中的实际 `device`。
+3. 在模型库查看该检查点，核对相机字段、完整模型处理器文件和本机校准。少量数据得到的冒烟模型行为可能无意义，实际执行需用户确认场地及急停条件。
+4. 经用户确认后完成短推理和手动停止，检查实际推理设备、推理数据集保存与硬件释放。
+
+脚本全通过仅代表环境检查完成。Apple Silicon 真机的采集、训练和推理需分别验收。当前文档更新在 Windows 上验证了检查脚本，macOS 执行结果仍需目标 Mac 确认。

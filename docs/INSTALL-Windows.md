@@ -28,7 +28,9 @@ py -3.12 --version
 
 ```powershell
 $runtime = Join-Path $env:LOCALAPPDATA 'EmbodyData\unified-runtime\lerobot-0.6.0'
+if (Test-Path $runtime) { throw '目标环境已存在，请按下方已有环境说明检查后复用' }
 py -3.12 -m venv $runtime
+if ($LASTEXITCODE -ne 0) { throw '创建环境失败，请先处理错误' }
 $python = Join-Path $runtime 'Scripts\python.exe'
 & $python -m pip install --upgrade pip setuptools wheel
 ```
@@ -60,7 +62,7 @@ $python = Join-Path $runtime 'Scripts\python.exe'
 & $python -c "import importlib.metadata as m; import cv2, cv2_enumerate_cameras, serial, torch, h5py, websockets; from lerobot.cameras.opencv import OpenCVCameraConfig; from lerobot.robots.so_follower.so_follower import SO101Follower; print('LeRobot:', m.version('lerobot')); print('PyTorch:', torch.__version__); print('CUDA:', torch.cuda.is_available()); print('OpenCV:', cv2.__version__)"
 ```
 
-ACT 使用的视觉骨干权重和 SmolVLA 权重会占用额外磁盘空间。首次训练前需确保相应权重已经准备好，或网络能够访问权重来源。
+ACT 和 SmolVLA 需要提前准备权重。训练与推理使用产品指定缓存，SmolVLA 以本地缓存模式检查指定 revision。请完成下方的应用环境检查和权重准备步骤。
 
 ## 4. 启动软件
 
@@ -81,3 +83,56 @@ Get-FileHash .\Tide-workstation-Windows-x64-preview.84.zip -Algorithm SHA256
 ## 验证范围
 
 此包为 Windows x64 预览构建。发布时执行构建产物与资源完整性检查、针对性自动化测试和压缩包校验。全新 Windows 电脑上的安装、真实设备采集、训练和推理全流程仍需进一步验收。
+
+## 已有环境和路径接入
+
+可复制 [README 中的 AI 提示词](../README.md#用-ai-处理-windows-运行环境)，让 AI 检查并接入已有环境。
+
+当前自动发现的统一入口是 `%LOCALAPPDATA%\EmbodyData\unified-runtime\lerobot-0.6.0\Scripts\python.exe`。已验证兼容的 Windows venv 可通过目录 Junction 接入。入口已存在时，先确认其用途和依赖，再决定如何处理。
+
+Windows Conda 环境通常把 `python.exe` 放在环境根目录，当前发现代码查找 `Scripts\python.exe`。AI 应检查真实布局，再选择合适方式。对于这种 Conda 布局，建议在约定入口创建独立 Python 3.12 venv。将 Conda 根目录直接链接到入口无法满足当前路径要求。
+
+采集、训练和推理的默认配置共用环境发现逻辑。旧配置中的 Sidecar 可执行路径、前缀参数、工作目录，以及 `TIDE_COLLECTOR_AGENT_EXECUTABLE` / `SO101_RUNTIME_EXECUTABLE` 覆盖项可能改变实际入口。升级用户需要由 AI 核对这些设置。确认环境后完全退出再启动应用，让常驻进程使用新配置。
+
+## 应用环境检查和 ACT 权重
+
+先完整解压并打开一次软件，让应用释放随包 Sidecar，再完全退出。随后在 PowerShell 执行以下命令。检查脚本读取随包 Sidecar 的缓存计算函数，支持目录链接后的实际路径。
+
+```powershell
+$runtime = Join-Path $env:LOCALAPPDATA 'EmbodyData\unified-runtime\lerobot-0.6.0'
+$python = Join-Path $runtime 'Scripts\python.exe'
+$sidecar = Join-Path $env:LOCALAPPDATA 'EmbodyData\sidecar'
+$check = Join-Path $env:TEMP 'tide-check-environment.py'
+Invoke-WebRequest 'https://raw.githubusercontent.com/Allentide/Tide-workstation/main/tools/check_environment.py' -OutFile $check
+& $python $check --sidecar-root $sidecar
+```
+
+首次检查可能报告缺少 ACT 权重。确认联网下载后执行下一条命令，它会将当前 ACT 默认的 ResNet18 权重放到应用实际使用的缓存，并校验和加载该文件。
+
+```powershell
+& $python $check --sidecar-root $sidecar --download-act
+& $python (Join-Path $sidecar 'scripts\collector-agent') training-capabilities
+```
+
+选择 SmolVLA 并安装其依赖后，可经授权下载产品锁定的两组完整权重，再做本地缓存检查。下载可能达到数 GB。
+
+```powershell
+& $python $check --sidecar-root $sidecar --download-smolvla
+& $python $check --sidecar-root $sidecar --smolvla
+```
+
+脚本检查 Python/依赖版本、三个 LeRobot 入口的导入、加速设备张量运算、默认 AV1 视频编码解码，以及 ACT 缓存和依赖冲突。它仅在临时目录写入测试视频，`--download-act` 明确开启权重下载。每个 `FAIL` 都需要处理后重跑。
+
+普通新建环境的 Torch 缓存通常在 `%LOCALAPPDATA%\EmbodyData\unified-runtime\torch-cache`。目录链接和既有 `TORCH_HOME` / `HF_HOME` 会影响真实缓存位置，以脚本输出和软件进程环境为准。脚本通过后，仍需核对软件日志或 Sidecar 进程实际使用的 Python 与该脚本一致。
+
+## 全流程验收
+
+让 AI 逐项记录结果，由用户确认硬件动作后执行。
+
+1. 软件重启后，核对 Sidecar 解释器、版本、缓存和权重，与环境检查输出一致。
+2. 连接设备并采集一个短 Episode，正常保存 Session，能在数据集页面回放相机画面和关节数据。
+3. 使用该 Episode 新建 ACT 冒烟训练，例如 100 步、Batch size 1、数据加载进程 0，确认实际 Loss 日志和最终 `pretrained_model` 文件。此参数仅用于验证流程。
+4. 从模型库选择刚生成的模型，先核对相机字段、完整检查点、设备组与校准状态。使用少量数据得到的冒烟模型行为可能无意义，实际机器人执行需用户确认场地和急停条件。
+5. 经用户确认后完成一次短推理和手动停止，核对模型加载设备、记录数据保存、设备释放结果。
+
+环境脚本全通过仅代表环境检查完成。完成上述软件和硬件步骤后，才能记录该电脑全流程通过。
