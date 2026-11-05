@@ -2,6 +2,8 @@
 
 本说明适用于 Apple Silicon（M 系列芯片）Mac。建议使用较新的 macOS，训练建议至少 16 GB 统一内存。具体系统兼容性仍受 PyTorch 等第三方包限制；Intel Mac 暂不在本版验证范围。
 
+希望让 AI 协助安装，可复制 [README 中的 macOS 环境准备提示词](../README.md#用-ai-帮你准备-macos-环境)。提示词按本说明的标准目录和版本执行，不适配其他项目的环境。
+
 ## 1. 下载应用
 
 从 [Releases](https://github.com/Allentide/Tide-workstation/releases) 下载 `Tide-workstation-macOS-preview.83.zip`，双击解压，将 `data_collector_workstation.app` 拖到“应用程序”。不要下载 GitHub 自动生成的 `Source code.zip`，它只有发布文档。
@@ -62,6 +64,8 @@ SO-101 主从臂通过 USB 连接，串口一般显示为 `/dev/cu.*`。发现�
 ## 4. 训练所需权重
 
 ACT 首次训练可能需要联网下载 ResNet18 预训练权重。此发布包没有附带权重，也不承诺首次启动断网可训练。
+
+本版默认 ACT 使用 `ResNet18_Weights.IMAGENET1K_V1`。软件未收到 `TORCH_HOME` 覆盖时，使用 `~/Library/Application Support/EmbodyData/unified-runtime/torch-cache`，权重文件位于其 `hub/checkpoints` 下。请让 AI 在这个缓存位置准备并验证权重，不要只放在终端默认的 `~/.cache/torch`。已有 `TORCH_HOME` / `HF_HOME` 时，应先核对软件进程实际使用的位置，不能仅以当前终端的下载成功作为依据。
 
 SmolVLA 还需要额外依赖和两组指定版本的权重。计划使用时，在同一环境执行：
 
